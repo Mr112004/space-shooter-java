@@ -1,0 +1,265 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Random;
+
+public class SpaceShooter extends JPanel implements KeyListener, ActionListener, MouseListener {
+    enum GameState { MENU, PLAYING, GAME_OVER }
+    private GameState state = GameState.MENU;
+
+    private boolean play = true;
+    private int playerX = 310;
+    private Timer timer;
+    private int delay = 10;
+
+    private ArrayList<Missile> missiles = new ArrayList<>();
+    private ArrayList<Asteroid> asteroids = new ArrayList<>();
+    private int score = 0;
+    private int tick = 0;
+    private int level = 1;
+
+    private Random random = new Random();
+    private ArrayList<Point> stars = new ArrayList<>();
+
+    private Rectangle startButton = new Rectangle(250, 250, 200, 50);
+    private Rectangle exitButton = new Rectangle(250, 320, 200, 50);
+
+    public SpaceShooter() {
+        addKeyListener(this);
+        addMouseListener(this);
+        setFocusable(true);
+        setFocusTraversalKeysEnabled(false);
+        timer = new Timer(delay, this);
+        timer.start();
+
+        // generate stars
+        for (int i = 0; i < 100; i++) {
+            stars.add(new Point(random.nextInt(700), random.nextInt(600)));
+        }
+    }
+
+    public void paint(Graphics g) {
+        // background
+        g.setColor(Color.black);
+        g.fillRect(0, 0, 700, 600);
+
+        // draw moving stars
+        g.setColor(Color.white);
+        for (Point p : stars) {
+            g.fillRect(p.x, p.y, 2, 2);
+        }
+
+        if (state == GameState.MENU) {
+            drawMenu(g);
+        } else if (state == GameState.PLAYING) {
+            drawGame(g);
+        } else if (state == GameState.GAME_OVER) {
+            drawGameOver(g);
+        }
+
+        g.dispose();
+    }
+
+    private void drawMenu(Graphics g) {
+        g.setColor(Color.cyan);
+        g.setFont(new Font("serif", Font.BOLD, 50));
+        g.drawString("Space Shooter", 160, 150);
+
+        g.setColor(Color.green);
+        g.fillRoundRect(startButton.x, startButton.y, startButton.width, startButton.height, 20, 20);
+        g.setColor(Color.black);
+        g.setFont(new Font("serif", Font.BOLD, 25));
+        g.drawString("Start Game", startButton.x + 35, startButton.y + 32);
+
+        g.setColor(Color.red);
+        g.fillRoundRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height, 20, 20);
+        g.setColor(Color.black);
+        g.drawString("Exit", exitButton.x + 75, exitButton.y + 32);
+    }
+
+    private void drawGame(Graphics g) {
+        // draw spaceship rocket 🚀
+        drawRocket(g, playerX, 480);
+
+        // missiles
+        g.setColor(Color.red);
+        for (Missile m : missiles) {
+            Polygon triangle = new Polygon();
+            triangle.addPoint(m.x, m.y);
+            triangle.addPoint(m.x - 3, m.y + 10);
+            triangle.addPoint(m.x + 3, m.y + 10);
+            g.fillPolygon(triangle);
+        }
+
+        // asteroids
+        g.setColor(Color.gray);
+        for (Asteroid a : asteroids) {
+            g.fillOval(a.x, a.y, 30, 30);
+        }
+
+        // score & level
+        g.setColor(Color.white);
+        g.setFont(new Font("serif", Font.BOLD, 20));
+        g.drawString("Score: " + score, 550, 30);
+        g.drawString("Level: " + level, 50, 30);
+    }
+
+    private void drawRocket(Graphics g, int x, int y) {
+        // body
+        g.setColor(Color.lightGray);
+        g.fillRect(x + 20, y + 10, 20, 40);
+
+        // nose cone
+        Polygon nose = new Polygon();
+        nose.addPoint(x + 30, y);          // tip
+        nose.addPoint(x + 20, y + 10);     // left
+        nose.addPoint(x + 40, y + 10);     // right
+        g.setColor(Color.red);
+        g.fillPolygon(nose);
+
+        // tail
+        Polygon tail = new Polygon();
+        tail.addPoint(x + 25, y + 50);
+        tail.addPoint(x + 35, y + 50);
+        tail.addPoint(x + 30, y + 60);
+        g.setColor(Color.orange);
+        g.fillPolygon(tail);
+    }
+
+    private void drawGameOver(Graphics g) {
+        drawGame(g);
+        g.setColor(Color.red);
+        g.setFont(new Font("serif", Font.BOLD, 30));
+        g.drawString("Game Over! Score: " + score, 200, 250);
+        g.setFont(new Font("serif", Font.BOLD, 20));
+        g.drawString("Press Enter to go to Menu", 230, 300);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        timer.start();
+
+        // move stars to create animation
+        for (Point p : stars) {
+            p.y += 1; // move down slowly
+            if (p.y > 600) p.y = 0;
+        }
+
+        if (state == GameState.PLAYING && play) {
+            tick++;
+
+            // update level
+            if (score > 200) level = 3;
+            else if (score > 120) level = 2;
+            else level = 1;
+
+            // auto shoot
+            if (tick % 15 == 0) {
+                missiles.add(new Missile(playerX + 30, 480));
+                if (level >= 2) missiles.add(new Missile(playerX + 15, 480));
+                if (level == 3) missiles.add(new Missile(playerX + 45, 480));
+            }
+
+            // spawn asteroids
+            if (tick % 50 == 0) {
+                asteroids.add(new Asteroid(random.nextInt(670), 0));
+            }
+
+            // move missiles
+            Iterator<Missile> missileIt = missiles.iterator();
+            while (missileIt.hasNext()) {
+                Missile m = missileIt.next();
+                m.y -= 7;
+                if (m.y < 0) missileIt.remove();
+            }
+
+            // move asteroids
+            Iterator<Asteroid> asteroidIt = asteroids.iterator();
+            while (asteroidIt.hasNext()) {
+                Asteroid a = asteroidIt.next();
+                a.y += 3;
+
+                if (new Rectangle(a.x, a.y, 30, 30).intersects(new Rectangle(playerX+20, 480+10, 20, 40))) {
+                    play = false;
+                    state = GameState.GAME_OVER;
+                }
+
+                Iterator<Missile> missileIt2 = missiles.iterator();
+                while (missileIt2.hasNext()) {
+                    Missile m = missileIt2.next();
+                    if (new Rectangle(a.x, a.y, 30, 30).intersects(new Rectangle(m.x - 3, m.y, 6, 10))) {
+                        asteroidIt.remove();
+                        missileIt2.remove();
+                        score += 10;
+                        break;
+                    }
+                }
+
+                if (a.y > 600) asteroidIt.remove();
+            }
+        }
+
+        repaint();
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+        if (state == GameState.PLAYING) {
+            if (e.getKeyCode() == KeyEvent.VK_RIGHT && playerX < 640) playerX += 40;
+            if (e.getKeyCode() == KeyEvent.VK_LEFT && playerX > 10) playerX -= 40;
+        } else if (state == GameState.GAME_OVER && e.getKeyCode() == KeyEvent.VK_ENTER) {
+            state = GameState.MENU;
+        }
+    }
+
+    @Override public void keyReleased(KeyEvent e) {}
+    @Override public void keyTyped(KeyEvent e) {}
+
+    @Override
+    public void mouseClicked(MouseEvent e) {
+        if (state == GameState.MENU) {
+            int mx = e.getX(), my = e.getY();
+            if (startButton.contains(mx, my)) startGame();
+            else if (exitButton.contains(mx, my)) System.exit(0);
+        }
+    }
+
+    private void startGame() {
+        play = true;
+        playerX = 310;
+        missiles.clear();
+        asteroids.clear();
+        score = 0;
+        tick = 0;
+        level = 1;
+        state = GameState.PLAYING;
+    }
+
+    @Override public void mousePressed(MouseEvent e) {}
+    @Override public void mouseReleased(MouseEvent e) {}
+    @Override public void mouseEntered(MouseEvent e) {}
+    @Override public void mouseExited(MouseEvent e) {}
+
+    public static void main(String[] args) {
+        JFrame obj = new JFrame();
+        SpaceShooter game = new SpaceShooter();
+        obj.setBounds(10, 10, 700, 600);
+        obj.setTitle("Space Shooter - Java");
+        obj.setResizable(false);
+        obj.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        obj.add(game);
+        obj.setVisible(true);
+    }
+
+    class Missile {
+        int x, y;
+        Missile(int x, int y) { this.x = x; this.y = y; }
+    }
+
+    class Asteroid {
+        int x, y;
+        Asteroid(int x, int y) { this.x = x; this.y = y; }
+    }
+}
